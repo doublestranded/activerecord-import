@@ -730,6 +730,9 @@ class ActiveRecord::Base
 
         # if there are auto-save associations on the models we imported that are new, import them as well
         import_associations(models, options.dup) if options[:recursive]
+        if options[:recursive] && options[:attachments]
+          import_attachments(models, options.dup)
+        end
       end
 
       return_obj
@@ -900,6 +903,21 @@ class ActiveRecord::Base
         association_primary_key = association_reflection.association_primary_key
         model.public_send("#{column_name}=", association.send(association_primary_key))
       end
+    end
+
+    def import_attachments(models, options)
+      attachments = models.map do |model|
+        model.attachment_changes.values.map(&:attachment)
+      end.flatten
+      
+      return if attachments.empty?
+
+      blobs = attachments.map do |attachment|
+        attachment.blob.tap(&:key)
+      end
+
+      blobs.first.class.bulk_import(blobs, {})
+      attachments.first.class.bulk_import(attachments, {})
     end
 
     def import_associations(models, options)
